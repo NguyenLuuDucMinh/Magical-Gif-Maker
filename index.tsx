@@ -9,6 +9,7 @@ const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
 const fps = 4;
 
 // DOM elements
+const imginput = document.getElementById('img_input') as HTMLInputElement;
 const promptInput = document.getElementById('prompt-input') as HTMLInputElement;
 const generateButton = document.getElementById(
   'generate-button',
@@ -119,6 +120,72 @@ async function run(value: string) {
     generateButton.disabled = true;
     generateButton.classList.add('loading');
   }
+  
+  const files = imginput?.files;
+const uploadedImageUrls: string[] = [];
+if (files && files.length > 0) {
+updateStatus('Using uploaded images...');
+for (let i = 0; i < files.length; i++) {
+const file = files.item(i);
+if (file) {
+const imageUrl = URL.createObjectURL(file);
+uploadedImageUrls.push(imageUrl);
+// Hiển thị trước các khung hình đã tải lên
+const frameElement = document.createElement('div');
+frameElement.className = 'frame';
+const frameNumber = document.createElement('div');
+frameNumber.className = 'frame-number';
+frameNumber.textContent = (i + 1).toString();
+frameElement.appendChild(frameNumber);
+const img = document.createElement('img');
+img.width = 128; // Hiển thị nhỏ hơn trong phần khung hình
+img.height = 128;
+img.src = imageUrl;
+frameElement.appendChild(img);
+framesContainer.appendChild(frameElement);
+setTimeout(() => {
+  frameElement.classList.add('appear');
+}, 50);
+}
+}
+
+if (uploadedImageUrls.length >= 2) {
+updateStatus('Creating GIF from uploaded images...');
+try {
+const gifImage = await createGifFromPngs(uploadedImageUrls);
+gifImage.className = 'result-image';
+if (resultContainer) {
+  resultContainer.appendChild(gifImage);
+  const downloadButton = createDownloadButton(gifImage.src);
+  resultContainer.appendChild(downloadButton);
+  switchTab('output');
+  setTimeout(() => {
+    resultContainer.classList.add('appear');
+    generationContainer.scrollIntoView({behavior: 'smooth'});
+  }, 50);
+  updateStatus('Done!');
+  return true;
+}
+} catch (error) {
+const msg = parseError(error);
+console.error('Error creating GIF from uploaded images:', error);
+updateStatus(`Error creating GIF: ${msg}`);
+return false;
+} finally {
+if (generateButton) {
+  generateButton.disabled = false;
+  generateButton.classList.remove('loading');
+}
+}
+} else if (uploadedImageUrls.length > 0) {
+updateStatus('Please select at least two images to create a GIF.');
+if (generateButton) {
+generateButton.disabled = false;
+generateButton.classList.remove('loading');
+}
+return false;
+} else {
+updateStatus('No images selected, generating with AI...');
 
   try {
     const expandPromptResponse = await ai.models.generateContent({
@@ -135,7 +202,7 @@ async function run(value: string) {
       },
     });
 
-    const prompt = `A doodle animation on a white background of ${expandPromptResponse.text}. Subtle motion but nothing else moves.`;
+    const prompt = `A doodle animation on a white background of ${expandPromptResponse.text}. Subtle motion but nothing else moves. Maximum 5 image one gif`;
     const style = `Simple, vibrant, varied-colored doodle/hand-drawn sketch`;
 
     const response = await ai.models.generateContentStream({
@@ -160,37 +227,26 @@ async function run(value: string) {
     let frameCount = 0;
 
     for await (const chunk of response) {
-      if (chunk.candidates && chunk.candidates[0].content?.parts) {
-        for (const part of chunk.candidates[0].content.parts) {
+      if (chunk.candidates && chunk.candidates?.[0]?.content?.parts) {
+        for (const part of chunk.candidates?.[0]?.content?.parts) {
           if (part.inlineData && framesContainer) {
             frameCount++;
             updateStatus(`Generated frame ${frameCount}`);
 
-            // Create a frame element for our UI
             const frameElement = document.createElement('div');
             frameElement.className = 'frame';
-
-            // Create and add the frame number
             const frameNumber = document.createElement('div');
             frameNumber.className = 'frame-number';
             frameNumber.textContent = frameCount.toString();
             frameElement.appendChild(frameNumber);
-
-            // Create the image as in the original
             const src = `data:image/png;base64,${part.inlineData.data}`;
             const img = document.createElement('img');
-            img.width = 1024;
-            img.height = 1024;
+            img.width = 128; // Hiển thị nhỏ hơn trong phần khung hình
+            img.height = 128;
             img.src = src;
-
-            // Add it to our frame element
             frameElement.appendChild(img);
             framesContainer.appendChild(frameElement);
-
-            // Store URL for GIF creation
             images.push(src);
-
-            // Animate the frame appearance
             setTimeout(() => {
               frameElement.classList.add('appear');
             }, 50);
@@ -200,43 +256,25 @@ async function run(value: string) {
     }
 
     if (frameCount < 2) {
-      updateStatus('Failed to generate any frames. Try another prompt.');
+      updateStatus('Failed to generate enough frames. Try another prompt.');
       return false;
     }
 
-    // Update status
     updateStatus('Creating GIF...');
-
-    // Create the GIF just like in the original
-    const img = await createGifFromPngs(images);
-    img.className = 'result-image';
-
-    // Clear and add to result container
+    const gifImage = await createGifFromPngs(images);
+    gifImage.className = 'result-image';
     if (resultContainer) {
-      resultContainer.appendChild(img);
-
-      // Add download button
-      const downloadButton = document.createElement('button');
-      downloadButton.className = 'download-button';
-      const icon = document.createElement('i');
-      icon.className = 'fas fa-download';
-      downloadButton.appendChild(icon);
-      downloadButton.onclick = () => {
-        const a = document.createElement('a') as HTMLAnchorElement;
-        a.href = img.src;
-        a.download = 'magical-animation.gif';
-        a.click();
-      };
+      resultContainer.appendChild(gifImage);
+      const downloadButton = createDownloadButton(gifImage.src);
       resultContainer.appendChild(downloadButton);
-
       switchTab('output');
       setTimeout(() => {
         resultContainer.classList.add('appear');
         generationContainer.scrollIntoView({behavior: 'smooth'});
       }, 50);
     }
-
     updateStatus('Done!');
+    return true;
   } catch (error) {
     const msg = parseError(error);
     console.error('Error generating animation:', error);
@@ -247,6 +285,8 @@ async function run(value: string) {
       generateButton.disabled = false;
       generateButton.classList.remove('loading');
     }
+  }
+}
   }
   return true;
 }
