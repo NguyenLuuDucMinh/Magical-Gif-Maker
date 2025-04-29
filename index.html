@@ -14,10 +14,17 @@
 
   <div class="input-container">
     <div class="input-field">
-      <input
-        type="file"
-        id="img-input"
-      />
+      <label for="image-input" class="file-label"> <!-- Thêm label cho dễ bấm -->
+        <i class="fas fa-image"></i> Choose Image
+        <!-- Sửa ID từ img-input thành image-input -->
+        <input type="file" id="image-input" accept="image/*" style="display: none;"/> <!-- Ẩn input gốc -->
+    </label>
+    <!-- Thêm thẻ img xem trước -->
+    <img id="image-preview" src="#" alt="Image Preview" class="image-preview-thumb"/>
+    <!-- Thêm nút xóa ảnh -->
+    <button id="clear-image-button" class="clear-image-btn" title="Clear Image">
+        <i class="fas fa-times"></i>
+    </button>
       <i class="fas fa-wand-magic-sparkles input-icon"></i>
       <input
         type="text"
